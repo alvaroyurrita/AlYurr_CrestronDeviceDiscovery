@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AYU_CrestronDeviceDiscovery", "AYU_CrestronDeviceDiscovery\AYU_CrestronDeviceDiscovery.csproj", "{BA93996C-1509-46BB-8A4E-5345240D3C82}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AYU_CrestronDeviceDiscovery.Tests", "AYU_CrestronDeviceDiscovery.Tests\AYU_CrestronDeviceDiscovery.Tests.csproj", "{13FCD062-82F0-4786-A9A2-1D382C085F96}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BA93996C-1509-46BB-8A4E-5345240D3C82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA93996C-1509-46BB-8A4E-5345240D3C82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA93996C-1509-46BB-8A4E-5345240D3C82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA93996C-1509-46BB-8A4E-5345240D3C82}.Release|Any CPU.Build.0 = Release|Any CPU
+		{13FCD062-82F0-4786-A9A2-1D382C085F96}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{13FCD062-82F0-4786-A9A2-1D382C085F96}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{13FCD062-82F0-4786-A9A2-1D382C085F96}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{13FCD062-82F0-4786-A9A2-1D382C085F96}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

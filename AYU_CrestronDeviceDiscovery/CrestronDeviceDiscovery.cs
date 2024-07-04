@@ -23,7 +23,7 @@ public class CrestronDeviceDiscovery
         udpClient.Client.ReceiveTimeout = 4000;
         udpClient.Client.ReceiveBufferSize = 1024;
         udpClient.EnableBroadcast = true;
-        //udpClient.Client.IOControl((IOControlCode)sio_udp_connreset, new byte[] { 0, 0, 0, 0 }, null);
+        udpClient.Client.IOControl((IOControlCode)sio_udp_connreset, new byte[] { 0, 0, 0, 0 }, null);
         var autoDiscoverMessage = new List<byte> { 0x14, 0x00, 0x00, 0x00, 0x01, 0x04, 0x00, 0x03, 0x00, 0x00 };
         autoDiscoverMessage = autoDiscoverMessage.Concat(Encoding.ASCII.GetBytes(Dns.GetHostName())).ToList();
         autoDiscoverMessage = autoDiscoverMessage.Concat(new byte[266 - autoDiscoverMessage.Count]).ToList();
@@ -76,6 +76,7 @@ public class CrestronDeviceDiscovery
     }
     public static async Task<List<CrestronDeviceEventArgs>> DiscoveryLocal()
     {
-        return await DiscoverAsync(3, "", "255.255.255.255");
+        return await DiscoverAsync(3, "","255.255.255.255");
+        // return await DiscoverAsync(3, "", "192.168.31.255");
     }
 }

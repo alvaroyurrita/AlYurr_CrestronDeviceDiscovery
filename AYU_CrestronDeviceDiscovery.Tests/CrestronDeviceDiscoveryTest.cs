@@ -15,6 +15,8 @@ public class CrestronDeviceDiscoveryTest
     [Test]
     public async Task DiscoverLocal_ShouldShowSomeDevices()
     {
+            _log.Information("Starting Test");
+
         var devicesDiscovered = new List<CrestronDeviceEventArgs>();
         CrestronDeviceDiscovery.DeviceDiscovered += (sender, args) =>
         {
@@ -23,5 +25,7 @@ public class CrestronDeviceDiscoveryTest
         };
         var devices = await CrestronDeviceDiscovery.DiscoveryLocal();
         Assert.That(devices.Count, Is.EqualTo(devicesDiscovered.Count));
+            _log.Information("Test ended with {Number} devices found", devices.Count);
+
     }
 }

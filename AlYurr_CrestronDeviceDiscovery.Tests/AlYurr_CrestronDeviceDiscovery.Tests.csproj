@@ -4,6 +4,8 @@
     <TargetFrameworks>net8.0</TargetFrameworks>
     
     <IsPackable>false</IsPackable>
+    
+    <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AYU_CrestronDeviceDiscovery\AYU_CrestronDeviceDiscovery.csproj" />
+    <ProjectReference Include="..\AlYurr_CrestronDeviceDiscovery\AlYurr_CrestronDeviceDiscovery.csproj" />
   </ItemGroup>
   
 </Project>

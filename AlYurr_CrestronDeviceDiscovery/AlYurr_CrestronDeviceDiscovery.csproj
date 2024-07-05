@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Title>Crestron Device Discovery Driver</Title>
+        <Description>Discovers Crestron Devices in the network or through a Remote Device     </Description>
+        <PackageProjectUrl>https://github.com/alvaroyurrita/AlYurr_CrestronDeviceDiscovery</PackageProjectUrl>
+        <PackageIcon>AlYurrLogo.png</PackageIcon>
+        <RepositoryUrl>https://github.com/alvaroyurrita/AlYurr_CrestronDeviceDiscovery</RepositoryUrl>
+        <RepositoryType>GitHub</RepositoryType>
+        <PackageTags>Crestron Discovery</PackageTags>
+        <PackageReleaseNotes>Initial Release</PackageReleaseNotes>
+        <Company>AlYurr</Company>
+        <AssemblyVersion>1.0.0</AssemblyVersion>
+        <FileVersion>1.0.0</FileVersion>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <DocumentationFile>bin\Debug\AlYurr_CrestronDeviceDiscovery.xml</DocumentationFile>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <DocumentationFile>bin\Release\AlYurr_CrestronDeviceDiscovery.xml</DocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Serilog" Version="4.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="AlYurrLogo.png" Pack="true" PackagePath="/"/>
+    </ItemGroup>
+
+</Project>

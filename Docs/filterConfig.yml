@@ -1,0 +1,10 @@
+### YamlMime:ManagedReference
+apiRules:
+- exclude:
+    # inherited Object methods
+    uidRegex: ^System\.Object\..*$
+    type: Method
+- exclude:
+    # mentioning types from System.* namespace
+    uidRegex: ^System\..*$
+    type: Type

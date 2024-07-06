@@ -42,7 +42,7 @@ public partial class CrestronDeviceDiscovery
         var udpClient = new UdpClient();
         var port = 41794;
         var ioc_in = 0x80000000;
-        var ioc_vendor = 0x18000000;
+        var ioc_vendor = (uint)0x18000000;
         var sio_udp_connreset = ioc_in | ioc_vendor | 12;
         var autoDiscoverResponse = new byte[] { 0x15, 0x00, 0x00, 0x00 };
         var autoDiscoveryMessagePattern =

@@ -31,18 +31,14 @@ public partial class CrestronDeviceDiscovery
     public static event EventHandler<ActivityEventArgs>? Activity;
     private static int _discoverDevicesCount;
     /// <summary> Quantity of Discovered Devices </summary>
-    public static int DiscoveredDevicesCount { get =>_discoverDevicesCount; }
+    public static int DiscoveredDevicesCount { get => _discoverDevicesCount; }
     private static SemaphoreSlim RunningSemaphore { get; } = new(1, 1);
     private static SemaphoreSlim EventSemaphore { get; } = new(1, 1);
     private static bool IsDiscovering { get; set; }
-    static CrestronDeviceDiscovery()
-    {
 
-    }
-
-    private static async Task<List<CrestronDeviceEventArgs>> DiscoverAsync(IpV4NetworkAdapter endPoint)
+    private static async Task<List<ICrestronDevice>> DiscoverAsync(IpV4NetworkAdapter endPoint)
     {
-        var discoveredDevices = new Dictionary<string, CrestronDeviceEventArgs>();
+        var discoveredDevices = new Dictionary<string, ICrestronDevice>();
         var udpClient = new UdpClient();
         var port = 41794;
         var ioc_in = 0x80000000;
@@ -122,7 +118,16 @@ public partial class CrestronDeviceDiscovery
     }
     /// <summary> Discovers Crestron Devices on the local network</summary>
     /// <returns> List of Devices Discovered</returns>
-    public static async Task<List<CrestronDeviceEventArgs>> DiscoveryLocal()
+    public static async Task<List<ICrestronDevice>> DiscoverFromAllAdapters()
+    {
+        var validAdapters = GetIpV4Adapters();
+        return await DiscoverFromAdapters(validAdapters);
+    }
+
+    /// <summary> Discovers Crestron Devices on the local network</summary>
+    /// <param name="adapters">List of PC adapters to listen from</param>
+    /// <returns> List of Devices Discovered</returns>
+    public static async Task<List<ICrestronDevice>> DiscoverFromAdapters(List<IpV4NetworkAdapter> adapters)
     {
         await RunningSemaphore.WaitAsync();
         IsDiscovering = true;
@@ -131,14 +136,13 @@ public partial class CrestronDeviceDiscovery
         var stopwatch = new Stopwatch();
         stopwatch.Start();
         timer.Elapsed += (_, _) => { OnUpdateActivity(stopwatch); };
-        var tasks = new List<Task<List<CrestronDeviceEventArgs>>>();
-        var validAdapters = GetIpV4Interfaces();
-        foreach (var adapter in validAdapters)
+        var tasks = new List<Task<List<ICrestronDevice>>>();
+        foreach (var adapter in adapters)
         {
             tasks.Add(DiscoverAsync(adapter));
         }
         var individualResults = await Task.WhenAll(tasks);
-        var results = new List<CrestronDeviceEventArgs>();
+        var results = new List<ICrestronDevice>();
         foreach (var individualResult in individualResults)
         {
             results.AddRange(individualResult);
@@ -150,6 +154,15 @@ public partial class CrestronDeviceDiscovery
         stopwatch.Stop();
         RunningSemaphore.Release();
         return results;
+    }
+
+
+    /// <summary> Discovers Crestron Devices from a single Netwrok Adapter</summary>
+    /// <param name="adapter">The PC adapter to listen from</param>
+    /// <returns> List of Devices Discovered</returns>
+    public static async Task<List<ICrestronDevice>> DiscoverFromAdapter(IpV4NetworkAdapter adapter)
+    {
+        return await DiscoverFromAdapters(new List<IpV4NetworkAdapter> { adapter });
     }
 
     private static void OnUpdateActivity(Stopwatch stopwatch)

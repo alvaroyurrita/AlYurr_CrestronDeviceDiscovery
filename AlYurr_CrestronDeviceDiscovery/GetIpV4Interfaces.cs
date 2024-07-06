@@ -9,7 +9,7 @@ public partial class CrestronDeviceDiscovery
     /// Gets all the IpV4 Adapters that are active in the computer
     /// </summary>
     /// <returns>A list of all IpV4 Network Adapters in the IpV4NetworkAdapter class</returns>
-    public static List<IpV4NetworkAdapter> GetIpV4Interfaces()
+    public static List<IpV4NetworkAdapter> GetIpV4Adapters()
     {
         var adapters = NetworkInterface.GetAllNetworkInterfaces().ToList();
         var ipV4Adapters = adapters.FindAll(a => a.Supports(NetworkInterfaceComponent.IPv4));

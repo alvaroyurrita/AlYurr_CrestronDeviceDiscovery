@@ -67,7 +67,7 @@ public class CrestronDeviceDiscovery
         udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         udpClient.Client.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, port));
         udpClient.Client.ReceiveTimeout = 4000;
-        udpClient.Client.ReceiveBufferSize = 1024;
+        udpClient.Client.ReceiveBufferSize = 65535;
         udpClient.EnableBroadcast = true;
         udpClient.Client.IOControl((IOControlCode)sio_udp_connreset, new byte[] { 0, 0, 0, 0 }, null);
         var autoDiscoverMessage = new List<byte> { 0x14, 0x00, 0x00, 0x00, 0x01, 0x04, 0x00, 0x03, 0x00, 0x00 };
@@ -82,19 +82,22 @@ public class CrestronDeviceDiscovery
         IsDiscovering = true;
         ClassLogger.Debug("Starting Discovery Process for {TotalTime:#.#} seconds. ", TotalTime.TotalSeconds);
         OnUpdateActivity();
-        Task.Run(async () =>
+        new Thread(() =>
         {
             for (int i = 0; i < 3; i++)
             {
-                ClassLogger.Debug("Sending Discovery Message No {No}", i+1);
-                await udpClient.SendAsync(autoDiscoverMessage.ToArray(), autoDiscoverMessage.Count, broadcastEndPoint);
-                await Task.Delay(500);
+                try
+                {
+                    ClassLogger.Debug("Sending Discovery Message No {No}", i + 1);
+                    udpClient.Send(autoDiscoverMessage.ToArray(), autoDiscoverMessage.Count, broadcastEndPoint);
+                }
+                catch { }
+                Thread.Sleep(500);
             }
-        });
+        }).Start();
         var timeout = DateTime.Now.AddSeconds(INITIAL_DISCOVERY_TIMEOUT);
         while (DateTime.Now < timeout)
         {
-            var devicesFound = false;
             while (udpClient.Available > 0)
             {
                 try
@@ -116,7 +119,6 @@ public class CrestronDeviceDiscovery
                         IpAddress = result.RemoteEndPoint.Address.ToString()
                     };
                     if (!DiscoveredDevices.TryAdd(device.IpAddress, device)) continue;
-                    devicesFound = true;
                     DeviceDiscovered?.Invoke(null, device);
                 }
                 catch (Exception ex)
@@ -124,12 +126,12 @@ public class CrestronDeviceDiscovery
                     Console.WriteLine(ex.Message);
                 }
             }
-            if (!devicesFound) continue;
-            timeout = timeout.AddSeconds(1);
-            TotalTime += TimeSpan.FromSeconds(1);
-            ClassLogger.Debug(
-                "Devices Discovered - Incrementing Timeout for 1 Second. New Total Time {TotalTime::#.#} Seconds",
-                TotalTime.TotalSeconds);
+            // if (!devicesFound) continue;
+            // timeout = timeout.AddSeconds(1);
+            // TotalTime += TimeSpan.FromSeconds(1);
+            // ClassLogger.Debug(
+            //     "Devices Discovered - Incrementing Timeout for 1 Second. New Total Time {TotalTime::#.#} Seconds",
+            //     TotalTime.TotalSeconds);
         }
         IsDiscovering = false;
         Timer.Stop();
@@ -148,7 +150,9 @@ public class CrestronDeviceDiscovery
     /// <returns> List of Devices Discovered</returns>
     public static async Task<List<CrestronDeviceEventArgs>> DiscoveryLocal()
     {
-        return await DiscoverAsync("", "255.255.255.255");
-        // return await DiscoverAsync(3, "", "192.168.31.255");
+        // return await DiscoverAsync("", "255.255.255.255");
+        return await DiscoverAsync("", "192.168.31.255");
     }
+
+    
 }

@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text;
@@ -11,9 +12,9 @@ namespace AlYurr_CrestronDeviceDiscovery;
 /// <summary>
 /// Crestron Device Discovery Class
 /// </summary>
-public class CrestronDeviceDiscovery
+public partial class CrestronDeviceDiscovery
 {
-    private const int INITIAL_DISCOVERY_TIMEOUT = 8;
+    private const int DISCOVERY_TIMEOUT = 8;
     /// <summary> Event triggered every time a device is discovered </summary>
     public static event EventHandler<CrestronDeviceEventArgs>? DeviceDiscovered;
     private static ILogger _classLogger = Log.Logger.ForContext<CrestronDeviceDiscovery>();
@@ -28,35 +29,21 @@ public class CrestronDeviceDiscovery
     }
     /// <summary> Event triggered every second to notify the discovery process status. </summary>
     public static event EventHandler<ActivityEventArgs>? Activity;
-    private static readonly Timer Timer = new(1000);
-    private static readonly Dictionary<string, CrestronDeviceEventArgs> DiscoveredDevices = new();
-    private static SemaphoreSlim Semaphore { get; } = new(1, 1);
-    private static TimeSpan TotalTime { get; set; }
-    private static readonly Stopwatch Stopwatch = new();
+    private static int _discoverDevicesCount;
+    /// <summary> Quantity of Discovered Devices </summary>
+    public static int DiscoveredDevicesCount { get =>_discoverDevicesCount; }
+    private static SemaphoreSlim RunningSemaphore { get; } = new(1, 1);
+    private static SemaphoreSlim EventSemaphore { get; } = new(1, 1);
     private static bool IsDiscovering { get; set; }
     static CrestronDeviceDiscovery()
     {
-        Timer.Elapsed += (_, _) => { OnUpdateActivity(); };
+
     }
-    private static void OnUpdateActivity()
+
+    private static async Task<List<CrestronDeviceEventArgs>> DiscoverAsync(IpV4NetworkAdapter endPoint)
     {
-        ClassLogger.Information(
-            "Timer Update: Devices Discovered: {DevicesDiscovered} Total Time: {TotalTime:#.#} seconds. Elapsed Time: {ElapsedTime:#.#}. Is Discovering: {IsDiscovering}",
-            DiscoveredDevices.Count, TotalTime.TotalSeconds, Stopwatch.Elapsed.TotalSeconds, IsDiscovering);
-        Activity?.Invoke(null, new ActivityEventArgs
-        {
-            DevicesDiscovered = DiscoveredDevices.Count,
-            TotalTime = TotalTime,
-            ElapsedTime = Stopwatch.Elapsed,
-            IsDiscovering = IsDiscovering,
-        });
-    }
-    private static async Task<List<CrestronDeviceEventArgs>> DiscoverAsync(string endPoint,
-        string broadcastAddress)
-    {
-        await Semaphore.WaitAsync();
+        var discoveredDevices = new Dictionary<string, CrestronDeviceEventArgs>();
         var udpClient = new UdpClient();
-        DiscoveredDevices.Clear();
         var port = 41794;
         var ioc_in = 0x80000000;
         var ioc_vendor = 0x18000000;
@@ -65,7 +52,7 @@ public class CrestronDeviceDiscovery
         var autoDiscoveryMessagePattern =
             @"(?<hostname>[\w-]*)\x00+(?<description>[\x20-\x7E]*\])(\s*\@(?<devid>[\x20-\x7E]*))?";
         udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        udpClient.Client.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, port));
+        udpClient.Client.Bind(new IPEndPoint(endPoint.IPAddress, port));
         udpClient.Client.ReceiveTimeout = 4000;
         udpClient.Client.ReceiveBufferSize = 65535;
         udpClient.EnableBroadcast = true;
@@ -73,15 +60,10 @@ public class CrestronDeviceDiscovery
         var autoDiscoverMessage = new List<byte> { 0x14, 0x00, 0x00, 0x00, 0x01, 0x04, 0x00, 0x03, 0x00, 0x00 };
         autoDiscoverMessage = autoDiscoverMessage.Concat(Encoding.ASCII.GetBytes(Dns.GetHostName())).ToList();
         autoDiscoverMessage = autoDiscoverMessage.Concat(new byte[266 - autoDiscoverMessage.Count]).ToList();
-        var broadcastEndPoint = new IPEndPoint(IPAddress.Parse(broadcastAddress), port);
+        var broadcastEndPoint = new IPEndPoint(IPAddress.Broadcast, port);
         var startTime = DateTime.Now;
-        var estimatedEndTime = startTime.AddSeconds(INITIAL_DISCOVERY_TIMEOUT);
-        TotalTime = estimatedEndTime - startTime;
-        Stopwatch.Start();
-        Timer.Start();
-        IsDiscovering = true;
-        ClassLogger.Debug("Starting Discovery Process for {TotalTime:#.#} seconds. ", TotalTime.TotalSeconds);
-        OnUpdateActivity();
+        var estimatedEndTime = startTime.AddSeconds(DISCOVERY_TIMEOUT);
+        ClassLogger.Debug("Starting Discovery Process for for interface {Interface} for {Time} seconds", endPoint.IPAddress, DISCOVERY_TIMEOUT);
         new Thread(() =>
         {
             for (int i = 0; i < 3; i++)
@@ -95,64 +77,92 @@ public class CrestronDeviceDiscovery
                 Thread.Sleep(500);
             }
         }).Start();
-        var timeout = DateTime.Now.AddSeconds(INITIAL_DISCOVERY_TIMEOUT);
-        while (DateTime.Now < timeout)
+        await Task.Run(async () =>
         {
-            while (udpClient.Available > 0)
+            var timeout = DateTime.Now.AddSeconds(DISCOVERY_TIMEOUT);
+            while (DateTime.Now < timeout)
             {
-                try
+                while (udpClient.Available > 0)
                 {
-                    var result = await udpClient.ReceiveAsync();
-                    if (result.Buffer.Length <= 0) continue;
-                    if (!result.Buffer.Take(autoDiscoverResponse.Length).SequenceEqual(autoDiscoverResponse))
-                        continue;
-                    var receivedMessage =
-                        Encoding.ASCII.GetString(result.Buffer.Skip(autoDiscoverResponse.Length).ToArray());
-                    var match = System.Text.RegularExpressions.Regex.Match(receivedMessage,
-                        autoDiscoveryMessagePattern);
-                    if (match.Groups.Count < 4) continue;
-                    var device = new CrestronDeviceEventArgs
+                    try
                     {
-                        Hostname = match.Groups["hostname"].Value,
-                        Description = match.Groups["description"].Value,
-                        DeviceId = match.Groups["devid"].Value,
-                        IpAddress = result.RemoteEndPoint.Address.ToString()
-                    };
-                    if (!DiscoveredDevices.TryAdd(device.IpAddress, device)) continue;
-                    DeviceDiscovered?.Invoke(null, device);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.Message);
+                        var result = await udpClient.ReceiveAsync();
+                        if (result.Buffer.Length <= 0) continue;
+                        if (!result.Buffer.Take(autoDiscoverResponse.Length).SequenceEqual(autoDiscoverResponse))
+                            continue;
+                        var receivedMessage =
+                            Encoding.ASCII.GetString(result.Buffer.Skip(autoDiscoverResponse.Length).ToArray());
+                        var match = System.Text.RegularExpressions.Regex.Match(receivedMessage,
+                            autoDiscoveryMessagePattern);
+                        if (match.Groups.Count < 4) continue;
+                        var device = new CrestronDeviceEventArgs
+                        {
+                            Hostname = match.Groups["hostname"].Value,
+                            Description = match.Groups["description"].Value,
+                            DeviceId = match.Groups["devid"].Value,
+                            IpAddress = result.RemoteEndPoint.Address.ToString()
+                        };
+                        if (!discoveredDevices.TryAdd(device.IpAddress, device)) continue;
+                        Interlocked.Increment(ref _discoverDevicesCount);
+                        await EventSemaphore.WaitAsync();
+                        DeviceDiscovered?.Invoke(null, device);
+                        EventSemaphore.Release();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
                 }
             }
-            // if (!devicesFound) continue;
-            // timeout = timeout.AddSeconds(1);
-            // TotalTime += TimeSpan.FromSeconds(1);
-            // ClassLogger.Debug(
-            //     "Devices Discovered - Incrementing Timeout for 1 Second. New Total Time {TotalTime::#.#} Seconds",
-            //     TotalTime.TotalSeconds);
-        }
-        IsDiscovering = false;
-        Timer.Stop();
-        OnUpdateActivity();
-        Stopwatch.Reset();
-        Stopwatch.Stop();
+        });
         udpClient.Dispose();
-        ClassLogger.Debug("Ending Discovery Processes after {TotalTime:#.#} seconds. {Devices} Found ",
-            TotalTime.TotalSeconds, DiscoveredDevices.Count);
-        Semaphore.Release();
-        return DiscoveredDevices.Select(d => d.Value).ToList();
+        ClassLogger.Debug("Ending Discovery Processes for Interface. {Devices}. Found {Number} devices", endPoint.IPAddress, discoveredDevices.Count);
+        // Semaphore.Release();
+        return discoveredDevices.Select(d => d.Value).ToList();
     }
-    /// <summary>
-    /// Discovers Crestron Devices on the local network
-    /// </summary>
+    /// <summary> Discovers Crestron Devices on the local network</summary>
     /// <returns> List of Devices Discovered</returns>
     public static async Task<List<CrestronDeviceEventArgs>> DiscoveryLocal()
     {
-        // return await DiscoverAsync("", "255.255.255.255");
-        return await DiscoverAsync("", "192.168.31.255");
+        await RunningSemaphore.WaitAsync();
+        IsDiscovering = true;
+        var timer = new Timer(1000);
+        timer.Start();
+        var stopwatch = new Stopwatch();
+        stopwatch.Start();
+        timer.Elapsed += (_, _) => { OnUpdateActivity(stopwatch); };
+        var tasks = new List<Task<List<CrestronDeviceEventArgs>>>();
+        var validAdapters = GetIpV4Interfaces();
+        foreach (var adapter in validAdapters)
+        {
+            tasks.Add(DiscoverAsync(adapter));
+        }
+        var individualResults = await Task.WhenAll(tasks);
+        var results = new List<CrestronDeviceEventArgs>();
+        foreach (var individualResult in individualResults)
+        {
+            results.AddRange(individualResult);
+        }
+        IsDiscovering = false;
+        timer.Stop();
+        OnUpdateActivity(stopwatch);
+        stopwatch.Reset();
+        stopwatch.Stop();
+        RunningSemaphore.Release();
+        return results;
     }
 
-    
+    private static void OnUpdateActivity(Stopwatch stopwatch)
+    {
+        ClassLogger.Information(
+            "Timer Update: Devices Discovered: {DevicesDiscovered} Total Time: {TotalTime:#.#} seconds. Elapsed Time: {ElapsedTime:#.#}. Is Discovering: {IsDiscovering}",
+            DiscoveredDevicesCount, DISCOVERY_TIMEOUT, stopwatch.Elapsed.TotalSeconds, IsDiscovering);
+        Activity?.Invoke(null, new ActivityEventArgs
+        {
+            DevicesDiscovered = DiscoveredDevicesCount,
+            TotalTime = new TimeSpan(0, 0, DISCOVERY_TIMEOUT),
+            ElapsedTime = stopwatch.Elapsed,
+            IsDiscovering = IsDiscovering,
+        });
+    }
 }

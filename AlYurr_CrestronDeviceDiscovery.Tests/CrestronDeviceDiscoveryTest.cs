@@ -1,19 +1,23 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using NUnit.Framework;
+﻿using NUnit.Framework;
+using Serilog.Core;
 using Serilog;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json.Nodes;
+using System.Threading.Tasks;
 
 namespace AlYurr_CrestronDeviceDiscovery.Tests;
 [TestFixture]
 [TestOf(typeof(CrestronDeviceDiscovery))]
 public class CrestronDeviceDiscoveryTest
 {
-    private readonly ILogger _log = new LoggerConfiguration()
+    private readonly Logger _log = new LoggerConfiguration()
         .MinimumLevel
         .Verbose()
         .WriteTo
         .NUnitOutput(
-            outputTemplate: "[{SourceContext} - {Timestamp:HH:mm:ss:fff} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+            outputTemplate: "[{SourceContext} - {Timestamp:HH:mm:ss:fff} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+        )
         .CreateLogger();
     [Test]
     public async Task DiscoverLocal_ShouldShowSomeDevices()
@@ -21,12 +25,12 @@ public class CrestronDeviceDiscoveryTest
         CrestronDeviceDiscovery.ClassLogger = _log;
         _log.Information("Starting Test");
         var devicesDiscovered = new List<CrestronDeviceEventArgs>();
-        CrestronDeviceDiscovery.DeviceDiscovered += (sender, args) =>
+        CrestronDeviceDiscovery.DeviceDiscovered += (_, args) =>
         {
             devicesDiscovered.Add(args);
             _log.Information("Device Discovered: {@Name}", args);
         };
-        CrestronDeviceDiscovery.Activity += (sender, args) => { _log.Information("Activity: {@Name}", args); };
+        CrestronDeviceDiscovery.Activity += (_, args) => { _log.Information("Activity: {@Name}", args); };
         var devices = await CrestronDeviceDiscovery.DiscoverFromAllAdapters();
         Assert.That(devices.Count, Is.EqualTo(devicesDiscovered.Count));
         _log.Information("Test ended with {Number} devices found", devices.Count);
@@ -43,7 +47,7 @@ public class CrestronDeviceDiscoveryTest
             devicesDiscovered.Add(args);
             _log.Information("Device Discovered: {@Name}", args);
         };
-        CrestronDeviceDiscovery.Activity += (sender, args) => { _log.Information("Activity: {@Name}", args); };
+        CrestronDeviceDiscovery.Activity += (_, args) => { _log.Information("Activity: {@Name}", args); };
         var adapters = CrestronDeviceDiscovery.GetIpV4Adapters();
         var adapter = adapters.Find(a => a.Name == "Video");
         if (adapter == null) return;
@@ -58,5 +62,28 @@ public class CrestronDeviceDiscoveryTest
         CrestronDeviceDiscovery.ClassLogger = _log;
         var adapters = CrestronDeviceDiscovery.GetIpV4Adapters();
         Assert.That(adapters.Count, Is.GreaterThan(0));
+    }
+    [Test]
+    public async Task RemoteDiscover_ShouldShowSomeDevices()
+    {
+        CrestronDeviceDiscovery.ClassLogger = _log;
+        _log.Information("Starting Test");
+        if (File.Exists("env.json") == false) Assert.Fail();
+        var connectionInfo = JsonNode.Parse(await File.ReadAllTextAsync("env.json"));
+        var devicesDiscovered = new List<CrestronDeviceEventArgs>();
+        CrestronDeviceDiscovery.DeviceDiscovered += (_, args) =>
+        {
+            devicesDiscovered.Add(args);
+            _log.Information("Device Discovered: {@Name}", args);
+        };
+        CrestronDeviceDiscovery.Activity += (_, args) => { _log.Information("Activity: {@Name}", args); };
+        var devices = await CrestronDeviceDiscovery.RemoteDiscovery(
+            connectionInfo?["Hostname"]?.ToString() ?? string.Empty,
+            connectionInfo?["Username"]?.ToString() ?? string.Empty,
+            connectionInfo?["Password"]?.ToString() ?? string.Empty
+        );
+        Assert.That(devices.Count, Is.EqualTo(devicesDiscovered.Count));
+        Assert.That(devices.Count, Is.GreaterThan(0));
+        _log.Information("Test ended with {Number} devices found", devices.Count);
     }
 }

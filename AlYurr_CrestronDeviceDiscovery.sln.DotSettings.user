@@ -8,5 +8,6 @@
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=4ea19eeb_002De495_002D436b_002D9f9d_002D9d1d240f2a94/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="DiscoverLocal_ShouldShowSomeDevices" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;TestAncestor&gt;&#xD;
     &lt;TestId&gt;NUnit3x::13FCD062-82F0-4786-A9A2-1D382C085F96::net8.0::AlYurr_CrestronDeviceDiscovery.Tests.CrestronDeviceDiscoveryTest.DiscoverLocal_ShouldShowSomeDevices&lt;/TestId&gt;&#xD;
+    &lt;TestId&gt;NUnit3x::13FCD062-82F0-4786-A9A2-1D382C085F96::net8.0::AlYurr_CrestronDeviceDiscovery.Tests.CrestronDeviceDiscoveryTest.RemoteDiscover_ShouldShowSomeDevices&lt;/TestId&gt;&#xD;
   &lt;/TestAncestor&gt;&#xD;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

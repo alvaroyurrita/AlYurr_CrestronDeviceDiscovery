@@ -1,17 +1,13 @@
-﻿using System.Diagnostics;
+﻿using Serilog;
+using System.Diagnostics;
 using System.Net;
-using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Runtime.InteropServices.JavaScript;
 using System.Text;
-using System.Timers;
-using Serilog;
+using System.Text.RegularExpressions;
 using Timer = System.Timers.Timer;
 
 namespace AlYurr_CrestronDeviceDiscovery;
-/// <summary>
-/// Crestron Device Discovery Class
-/// </summary>
+/// <summary> Crestron Device Discovery Class </summary>
 public partial class CrestronDeviceDiscovery
 {
     private const int DISCOVERY_TIMEOUT = 8;
@@ -31,7 +27,7 @@ public partial class CrestronDeviceDiscovery
     public static event EventHandler<ActivityEventArgs>? Activity;
     private static int _discoverDevicesCount;
     /// <summary> Quantity of Discovered Devices </summary>
-    public static int DiscoveredDevicesCount { get => _discoverDevicesCount; }
+    public static int DiscoveredDevicesCount => _discoverDevicesCount;
     private static SemaphoreSlim RunningSemaphore { get; } = new(1, 1);
     private static SemaphoreSlim EventSemaphore { get; } = new(1, 1);
     private static bool IsDiscovering { get; set; }
@@ -40,46 +36,61 @@ public partial class CrestronDeviceDiscovery
     {
         var discoveredDevices = new Dictionary<string, ICrestronDevice>();
         var udpClient = new UdpClient();
-        var port = 41794;
-        var ioc_in = 0x80000000;
-        var ioc_vendor = (uint)0x18000000;
-        var sio_udp_connreset = ioc_in | ioc_vendor | 12;
+        const int port = 41794;
+        const uint iocIn = 0x80000000;
+        const uint iocVendor = 0x18000000;
+        const uint sioUdpConnectionReset = iocIn | iocVendor | 12;
         var autoDiscoverResponse = new byte[] { 0x15, 0x00, 0x00, 0x00 };
-        var autoDiscoveryMessagePattern =
+        const string autoDiscoveryMessagePattern =
             @"(?<hostname>[\w-]*)\x00+(?<description>[\x20-\x7E]*\])(\s*\@(?<devid>[\x20-\x7E]*))?";
         udpClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         udpClient.Client.Bind(new IPEndPoint(endPoint.IPAddress, port));
         udpClient.Client.ReceiveTimeout = 4000;
         udpClient.Client.ReceiveBufferSize = 65535;
         udpClient.EnableBroadcast = true;
-        udpClient.Client.IOControl((IOControlCode)sio_udp_connreset, new byte[] { 0, 0, 0, 0 }, null);
-        var autoDiscoverMessage = new List<byte> { 0x14, 0x00, 0x00, 0x00, 0x01, 0x04, 0x00, 0x03, 0x00, 0x00 };
+        udpClient.Client.IOControl((IOControlCode)sioUdpConnectionReset, new byte[] { 0, 0, 0, 0 }, null);
+        var autoDiscoverMessage = new List<byte>
+        {
+            0x14,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+            0x04,
+            0x00,
+            0x03,
+            0x00,
+            0x00
+        };
         autoDiscoverMessage = autoDiscoverMessage.Concat(Encoding.ASCII.GetBytes(Dns.GetHostName())).ToList();
         autoDiscoverMessage = autoDiscoverMessage.Concat(new byte[266 - autoDiscoverMessage.Count]).ToList();
         var broadcastEndPoint = new IPEndPoint(IPAddress.Broadcast, port);
-        var startTime = DateTime.Now;
-        var estimatedEndTime = startTime.AddSeconds(DISCOVERY_TIMEOUT);
-        ClassLogger.Debug("Starting Discovery Process for for interface {Interface} for {Time} seconds", endPoint.IPAddress, DISCOVERY_TIMEOUT);
-        new Thread(() =>
-        {
-            for (int i = 0; i < 3; i++)
+        ClassLogger.Debug(
+            "Starting Discovery Process for for interface {Interface} for {Time} seconds",
+            endPoint.IPAddress,
+            DISCOVERY_TIMEOUT
+        );
+        new Thread(
+            () =>
             {
-                try
+                for (var i = 0; i < 3; i++)
                 {
-                    ClassLogger.Debug("Sending Discovery Message No {No}", i + 1);
-                    udpClient.Send(autoDiscoverMessage.ToArray(), autoDiscoverMessage.Count, broadcastEndPoint);
+                    try
+                    {
+                        ClassLogger.Debug("Sending Discovery Message No {No}", i + 1);
+                        udpClient.Send(autoDiscoverMessage.ToArray(), autoDiscoverMessage.Count, broadcastEndPoint);
+                    }
+                    catch { }
+                    Thread.Sleep(500);
                 }
-                catch { }
-                Thread.Sleep(500);
             }
-        }).Start();
-        await Task.Run(async () =>
-        {
-            var timeout = DateTime.Now.AddSeconds(DISCOVERY_TIMEOUT);
-            while (DateTime.Now < timeout)
+        ).Start();
+        await Task.Run(
+            async () =>
             {
+                var timeout = DateTime.Now.AddSeconds(DISCOVERY_TIMEOUT);
+                while (DateTime.Now < timeout)
                 while (udpClient.Available > 0)
-                {
                     try
                     {
                         var result = await udpClient.ReceiveAsync();
@@ -88,8 +99,10 @@ public partial class CrestronDeviceDiscovery
                             continue;
                         var receivedMessage =
                             Encoding.ASCII.GetString(result.Buffer.Skip(autoDiscoverResponse.Length).ToArray());
-                        var match = System.Text.RegularExpressions.Regex.Match(receivedMessage,
-                            autoDiscoveryMessagePattern);
+                        var match = Regex.Match(
+                            receivedMessage,
+                            autoDiscoveryMessagePattern
+                        );
                         if (match.Groups.Count < 4) continue;
                         var device = new CrestronDeviceEventArgs
                         {
@@ -104,29 +117,29 @@ public partial class CrestronDeviceDiscovery
                         DeviceDiscovered?.Invoke(null, device);
                         EventSemaphore.Release();
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
-                }
+                    catch (Exception ex) { Console.WriteLine(ex.Message); }
             }
-        });
+        );
         udpClient.Dispose();
-        ClassLogger.Debug("Ending Discovery Processes for Interface. {Devices}. Found {Number} devices", endPoint.IPAddress, discoveredDevices.Count);
+        ClassLogger.Debug(
+            "Ending Discovery Processes for Interface. {Devices}. Found {Number} devices",
+            endPoint.IPAddress,
+            discoveredDevices.Count
+        );
         // Semaphore.Release();
         return discoveredDevices.Select(d => d.Value).ToList();
     }
-    /// <summary> Discovers Crestron Devices on the local network</summary>
-    /// <returns> List of Devices Discovered</returns>
+    /// <summary> Discovers Crestron Devices on the local network </summary>
+    /// <returns> List of Devices Discovered </returns>
     public static async Task<List<ICrestronDevice>> DiscoverFromAllAdapters()
     {
         var validAdapters = GetIpV4Adapters();
         return await DiscoverFromAdapters(validAdapters);
     }
 
-    /// <summary> Discovers Crestron Devices on the local network</summary>
-    /// <param name="adapters">List of PC adapters to listen from</param>
-    /// <returns> List of Devices Discovered</returns>
+    /// <summary> Discovers Crestron Devices on the local network </summary>
+    /// <param name="adapters"> List of PC adapters to listen from </param>
+    /// <returns> List of Devices Discovered </returns>
     public static async Task<List<ICrestronDevice>> DiscoverFromAdapters(List<IpV4NetworkAdapter> adapters)
     {
         await RunningSemaphore.WaitAsync();
@@ -137,45 +150,22 @@ public partial class CrestronDeviceDiscovery
         stopwatch.Start();
         timer.Elapsed += (_, _) => { OnUpdateActivity(stopwatch); };
         var tasks = new List<Task<List<ICrestronDevice>>>();
-        foreach (var adapter in adapters)
-        {
-            tasks.Add(DiscoverAsync(adapter));
-        }
+        foreach (var adapter in adapters) tasks.Add(DiscoverAsync(adapter));
         var individualResults = await Task.WhenAll(tasks);
         var results = new List<ICrestronDevice>();
-        foreach (var individualResult in individualResults)
-        {
-            results.AddRange(individualResult);
-        }
+        foreach (var individualResult in individualResults) results.AddRange(individualResult);
         IsDiscovering = false;
         timer.Stop();
         OnUpdateActivity(stopwatch);
-        stopwatch.Reset();
         stopwatch.Stop();
+        stopwatch.Reset();
         RunningSemaphore.Release();
         return results;
     }
 
-
-    /// <summary> Discovers Crestron Devices from a single Netwrok Adapter</summary>
-    /// <param name="adapter">The PC adapter to listen from</param>
-    /// <returns> List of Devices Discovered</returns>
-    public static async Task<List<ICrestronDevice>> DiscoverFromAdapter(IpV4NetworkAdapter adapter)
-    {
-        return await DiscoverFromAdapters(new List<IpV4NetworkAdapter> { adapter });
-    }
-
-    private static void OnUpdateActivity(Stopwatch stopwatch)
-    {
-        ClassLogger.Information(
-            "Timer Update: Devices Discovered: {DevicesDiscovered} Total Time: {TotalTime:#.#} seconds. Elapsed Time: {ElapsedTime:#.#}. Is Discovering: {IsDiscovering}",
-            DiscoveredDevicesCount, DISCOVERY_TIMEOUT, stopwatch.Elapsed.TotalSeconds, IsDiscovering);
-        Activity?.Invoke(null, new ActivityEventArgs
-        {
-            DevicesDiscovered = DiscoveredDevicesCount,
-            TotalTime = new TimeSpan(0, 0, DISCOVERY_TIMEOUT),
-            ElapsedTime = stopwatch.Elapsed,
-            IsDiscovering = IsDiscovering,
-        });
-    }
+    /// <summary> Discovers Crestron Devices from a single Netwrok Adapter </summary>
+    /// <param name="adapter"> The PC adapter to listen from </param>
+    /// <returns> List of Devices Discovered </returns>
+    public static async Task<List<ICrestronDevice>> DiscoverFromAdapter(IpV4NetworkAdapter adapter) =>
+        await DiscoverFromAdapters(new List<IpV4NetworkAdapter> { adapter });
 }

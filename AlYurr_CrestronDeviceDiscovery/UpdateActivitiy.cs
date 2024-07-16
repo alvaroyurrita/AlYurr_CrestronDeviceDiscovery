@@ -19,7 +19,8 @@ public partial class CrestronDeviceDiscovery
                 DevicesDiscovered = DiscoveredDevicesCount,
                 TotalTime = new TimeSpan(0, 0, DISCOVERY_TIMEOUT),
                 ElapsedTime = stopwatch.Elapsed,
-                IsDiscovering = IsDiscovering
+                IsDiscovering = IsDiscovering,
+                Error = _error
             }
         );
     }

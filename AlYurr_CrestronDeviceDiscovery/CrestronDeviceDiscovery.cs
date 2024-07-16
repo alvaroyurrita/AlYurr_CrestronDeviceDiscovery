@@ -27,13 +27,15 @@ public partial class CrestronDeviceDiscovery
     public static event EventHandler<ActivityEventArgs>? Activity;
     private static int _discoverDevicesCount;
     /// <summary> Quantity of Discovered Devices </summary>
-    public static int DiscoveredDevicesCount => _discoverDevicesCount;
+    private static int DiscoveredDevicesCount => _discoverDevicesCount;
     private static SemaphoreSlim RunningSemaphore { get; } = new(1, 1);
     private static SemaphoreSlim EventSemaphore { get; } = new(1, 1);
     private static bool IsDiscovering { get; set; }
+    private static string _error = "";
 
     private static async Task<List<ICrestronDevice>> DiscoverAsync(IpV4NetworkAdapter endPoint)
     {
+        _error = string.Empty;;
         var discoveredDevices = new Dictionary<string, ICrestronDevice>();
         var udpClient = new UdpClient();
         const int port = 41794;
@@ -80,7 +82,11 @@ public partial class CrestronDeviceDiscovery
                         ClassLogger.Debug("Sending Discovery Message No {No}", i + 1);
                         udpClient.Send(autoDiscoverMessage.ToArray(), autoDiscoverMessage.Count, broadcastEndPoint);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Error while sending discovery UDP Packet: {Error}", ex.Message);
+                        _error = ex.Message;
+                    }
                     Thread.Sleep(500);
                 }
             }
@@ -117,7 +123,11 @@ public partial class CrestronDeviceDiscovery
                         DeviceDiscovered?.Invoke(null, device);
                         EventSemaphore.Release();
                     }
-                    catch (Exception ex) { Console.WriteLine(ex.Message); }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Error while receiving UDP Packet: {Error}", ex.Message);
+                        _error = ex.Message;
+                    }
             }
         );
         udpClient.Dispose();

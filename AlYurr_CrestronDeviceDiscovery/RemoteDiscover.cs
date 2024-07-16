@@ -7,6 +7,8 @@ using Timer = System.Timers.Timer;
 namespace AlYurr_CrestronDeviceDiscovery;
 public partial class CrestronDeviceDiscovery
 {
+    private const int REMOTE_DISCOVERY_TIMEOUT = 10;
+    private const int CONNECTION_TIMEOUT = 5;
     private static readonly CancellationTokenSource StopSearching = new();
     private const string REMOTE_DISCOVERY_REG_PATTERN =
         @"^(?'IpAddress'[0-9\.]*)( :.*? : )(?'Hostname'.*)( :.*? )(?'Description'.*)( @)(?'DeviceId'.*)$";
@@ -22,17 +24,18 @@ public partial class CrestronDeviceDiscovery
         string username,
         string password)
     {
+        _error = string.Empty;
         await RunningSemaphore.WaitAsync(StopSearching.Token);
         if (StopSearching.Token.IsCancellationRequested) return new List<ICrestronDevice>();
         IsDiscovering = true;
         var timer = new Timer(1000);
-        timer.Start();
         var stopwatch = new Stopwatch();
+        timer.Start();
         stopwatch.Start();
         timer.Elapsed += (_, _) =>
         {
             OnUpdateActivity(stopwatch);
-            if (!(stopwatch.Elapsed.TotalSeconds >= DISCOVERY_TIMEOUT)) return;
+            if (!(stopwatch.Elapsed.TotalSeconds >= REMOTE_DISCOVERY_TIMEOUT)) return;
             timer.Stop();
             IsDiscovering = false;
             RunningSemaphore.Release();
@@ -46,7 +49,7 @@ public partial class CrestronDeviceDiscovery
             username,
             keyboardInteractiveMethod,
             passwordAuthenticationMethod
-        ) { Encoding = Encoding.GetEncoding("ISO-8859-1"), Timeout = TimeSpan.FromSeconds(10) };
+        ) { Encoding = Encoding.GetEncoding("ISO-8859-1"), Timeout = TimeSpan.FromSeconds(CONNECTION_TIMEOUT) };
         var results = new List<ICrestronDevice>();
         keyboardInteractiveMethod.AuthenticationPrompt += (sender, args) =>
         {
@@ -82,10 +85,12 @@ public partial class CrestronDeviceDiscovery
         }
         catch (Exception ex)
         {
-            ClassLogger.Error(ex, "Error Connecting to {RemoteHost}", remoteHost);
+            ClassLogger.Error("Error Connecting to {RemoteHost}: {ErrorMessage}", remoteHost, ex.Message);
             IsDiscovering = false;
             RunningSemaphore.Release();
             StopSearching.Cancel();
+            _error = ex.Message;
+            OnUpdateActivity(stopwatch);
             return new List<ICrestronDevice>();
         }
         sshClient.Disconnect();
@@ -93,6 +98,11 @@ public partial class CrestronDeviceDiscovery
         if (!string.IsNullOrEmpty(error))
         {
             ClassLogger.Error("Error retrieving results from {RemoteHost} - {Error}", remoteHost, error);
+            IsDiscovering = false;
+            RunningSemaphore.Release();
+            StopSearching.Cancel();
+            _error = command.Error;
+            OnUpdateActivity(stopwatch);
             return new List<ICrestronDevice>();
         }
         var result = command.Result;

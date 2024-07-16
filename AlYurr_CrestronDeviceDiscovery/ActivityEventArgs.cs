@@ -11,4 +11,7 @@ public class ActivityEventArgs : EventArgs
     public int DevicesDiscovered { get; set; }
     /// <summary> Discovery Status. </summary>
     public bool IsDiscovering { get; set; }
+    /// <summary> If an error occured during discover, it will be shown here, otherwise it will be empty. </summary>
+    public string Error { get; set; } = string.Empty;
+
 }

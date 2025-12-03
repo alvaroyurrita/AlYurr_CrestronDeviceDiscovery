@@ -15,7 +15,7 @@
       "memberLayout": "separatePages",
       "properties" :
       {
-        "TargetFramework": "net6.0"
+        "TargetFramework": "net10.0"
       }
     }
   ],
@@ -47,8 +47,8 @@
       "_appTitle": "Crestron Device Discovery",
       "_enableSearch": true,
       "pdf": false,
-      "_appFaviconPath": "images/AlYurrLogo.svg",
-      "_appLogoPath": "images/AlYurrLogo.svg",
+      "_appFaviconPath": "images/favicon.png",
+      "_appLogoPath": "images/AlYurrLogo.png",
       "_appFooter": "<strong>Alvaro Yurrita</strong> © 2024",
       "_copyrightFooter": "MIT License",
       "_disableSideFilter": false,

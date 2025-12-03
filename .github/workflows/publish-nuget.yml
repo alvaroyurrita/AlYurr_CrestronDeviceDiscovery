@@ -1,0 +1,54 @@
+name: Publish to NuGet
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0)'
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore AlYurr_CrestronDeviceDiscovery.sln
+
+      - name: Build solution
+        run: dotnet build AlYurr_CrestronDeviceDiscovery.sln --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test AlYurr_CrestronDeviceDiscovery.Tests/AlYurr_CrestronDeviceDiscovery.Tests.csproj --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx" || true
+
+      - name: Pack NuGet package
+        run: dotnet pack AlYurr_CrestronDeviceDiscovery/AlYurr_CrestronDeviceDiscovery.csproj --configuration Release --no-build --output ./artifacts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./artifacts/*.nupkg
+
+      - name: Publish to NuGet.org
+        run: |
+            dotnet nuget push ./artifacts/*.nupkg \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'

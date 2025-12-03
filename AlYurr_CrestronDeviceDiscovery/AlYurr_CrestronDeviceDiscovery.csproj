@@ -7,15 +7,22 @@
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <Title>Crestron Device Discovery Driver</Title>
         <Description>Discovers Crestron Devices in the network or through a Remote Device</Description>
-        <PackageProjectUrl>https://github.com/alvaroyurrita/AlYurr_CrestronDeviceDiscovery</PackageProjectUrl>
+        <PackageProjectUrl>https://alvaroyurrita.github.io/AlYurr_CrestronDeviceDiscovery/index.html</PackageProjectUrl>
         <PackageIcon>AlYurrLogo.png</PackageIcon>
         <RepositoryUrl>https://github.com/alvaroyurrita/AlYurr_CrestronDeviceDiscovery</RepositoryUrl>
         <RepositoryType>GitHub</RepositoryType>
-        <PackageTags>Crestron Discovery</PackageTags>
+        <PackageTags>Crestron Device Discovery</PackageTags>
         <PackageReleaseNotes>Initial Release</PackageReleaseNotes>
         <Company>AlYurr</Company>
         <AssemblyVersion>1.0.0</AssemblyVersion>
         <FileVersion>1.0.0</FileVersion>
+        <Authors>Alvaro Yurrita</Authors>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <IncludeSymbols>True</IncludeSymbols>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <NuGetAuditMode>all</NuGetAuditMode>
+        <Copyright>Copyright (c) 2025 Alvaro Yurrita</Copyright>
+        <NeutralLanguage>en</NeutralLanguage>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -26,13 +33,26 @@
         <DocumentationFile>bin\Release\AlYurr_CrestronDeviceDiscovery.xml</DocumentationFile>
     </PropertyGroup>
 
+	<PropertyGroup Condition="'$(Configuration)'=='Release'">
+		<Deterministic>True</Deterministic>
+		<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+	</PropertyGroup>
+
     <ItemGroup>
-        <PackageReference Include="Serilog" Version="4.0.0"/>
-        <PackageReference Include="SSH.NET" Version="2024.1.0"/>
+        <PackageReference Include="Serilog" Version="4.0.0" />
+        <PackageReference Include="SSH.NET" Version="2024.1.0" />
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="AlYurrLogo.png" Pack="true" PackagePath="/"/>
+        <None Include="..\LICENSE">
+          <Pack>True</Pack>
+          <PackagePath>\</PackagePath>
+        </None>
+        <None Include="..\README.md">
+          <Pack>True</Pack>
+          <PackagePath>\</PackagePath>
+        </None>
+        <None Include="AlYurrLogo.png" Pack="true" PackagePath="/" />
     </ItemGroup>
 
 </Project>

@@ -9,7 +9,6 @@ public partial class CrestronDeviceDiscovery
 {
     private const int REMOTE_DISCOVERY_TIMEOUT = 10;
     private const int CONNECTION_TIMEOUT = 5;
-    private static readonly CancellationTokenSource StopSearching = new();
     private const string REMOTE_DISCOVERY_REG_PATTERN =
         @"^(?'IpAddress'[0-9\.]*)( :.*? : )(?'Hostname'.*)( :.*? )(?'Description'.*)( @)(?'DeviceId'.*)$";
     /// <summary>
@@ -25,8 +24,6 @@ public partial class CrestronDeviceDiscovery
         string password)
     {
         _error = string.Empty;
-        await RunningSemaphore.WaitAsync(StopSearching.Token);
-        if (StopSearching.Token.IsCancellationRequested) return new List<ICrestronDevice>();
         IsDiscovering = true;
         var timer = new Timer(1000);
         var stopwatch = new Stopwatch();
@@ -37,9 +34,8 @@ public partial class CrestronDeviceDiscovery
             OnUpdateActivity(stopwatch);
             if (!(stopwatch.Elapsed.TotalSeconds >= REMOTE_DISCOVERY_TIMEOUT)) return;
             timer.Stop();
+            stopwatch.Stop();
             IsDiscovering = false;
-            RunningSemaphore.Release();
-            StopSearching.Cancel();
         };
         var keyboardInteractiveMethod = new KeyboardInteractiveAuthenticationMethod(username);
         var passwordAuthenticationMethod = new PasswordAuthenticationMethod(username, password);
@@ -50,7 +46,7 @@ public partial class CrestronDeviceDiscovery
             keyboardInteractiveMethod,
             passwordAuthenticationMethod
         ) { Encoding = Encoding.GetEncoding("ISO-8859-1"), Timeout = TimeSpan.FromSeconds(CONNECTION_TIMEOUT) };
-        var results = new List<ICrestronDevice>();
+        var results = new Dictionary<string,ICrestronDevice>();
         keyboardInteractiveMethod.AuthenticationPrompt += (sender, args) =>
         {
             foreach (var prompt in args.Prompts)
@@ -78,7 +74,7 @@ public partial class CrestronDeviceDiscovery
                 DeviceId = verMatch.Groups["DeviceId"].Value.Trim()
             };
             DeviceDiscovered?.Invoke(null, selfDevice);
-            results.Add(selfDevice);
+            results.Add(selfDevice.DeviceId,selfDevice);
             _discoverDevicesCount = results.Count;
             command = sshClient.CreateCommand("autodiscovery query");
             await command.ExecuteAsync();
@@ -87,8 +83,6 @@ public partial class CrestronDeviceDiscovery
         {
             ClassLogger.Error("Error Connecting to {RemoteHost}: {ErrorMessage}", remoteHost, ex.Message);
             IsDiscovering = false;
-            RunningSemaphore.Release();
-            StopSearching.Cancel();
             _error = ex.Message;
             OnUpdateActivity(stopwatch);
             return new List<ICrestronDevice>();
@@ -99,8 +93,6 @@ public partial class CrestronDeviceDiscovery
         {
             ClassLogger.Error("Error retrieving results from {RemoteHost} - {Error}", remoteHost, error);
             IsDiscovering = false;
-            RunningSemaphore.Release();
-            StopSearching.Cancel();
             _error = command.Error;
             OnUpdateActivity(stopwatch);
             return new List<ICrestronDevice>();
@@ -125,13 +117,12 @@ public partial class CrestronDeviceDiscovery
                 DeviceId = match.Groups["DeviceId"].Value
             };
             DeviceDiscovered?.Invoke(null, device);
-            results.Add(device);
+            if (!results.TryAdd(device.DeviceId, device)) continue;
         }
         _discoverDevicesCount = results.Count;
         IsDiscovering = false;
         OnUpdateActivity(stopwatch);
         stopwatch.Reset();
-        RunningSemaphore.Release();
-        return results;
+        return [.. results.Select(d => d.Value)];
     }
 }

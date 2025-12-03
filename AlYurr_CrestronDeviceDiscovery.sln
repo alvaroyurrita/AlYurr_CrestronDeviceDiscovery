@@ -1,8 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11222.15 d18.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlYurr_CrestronDeviceDiscovery", "AlYurr_CrestronDeviceDiscovery\AlYurr_CrestronDeviceDiscovery.csproj", "{BA93996C-1509-46BB-8A4E-5345240D3C82}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AlYurr_CrestronDeviceDiscovery.Tests", "AlYurr_CrestronDeviceDiscovery.Tests\AlYurr_CrestronDeviceDiscovery.Tests.csproj", "{13FCD062-82F0-4786-A9A2-1D382C085F96}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CrestronDeviceDiscoveryConsoleApp", "CrestronDeviceDiscoveryConsoleApp\CrestronDeviceDiscoveryConsoleApp.csproj", "{165C6879-A388-49E2-A449-55C94FAE10D3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,5 +23,12 @@ Global
 		{13FCD062-82F0-4786-A9A2-1D382C085F96}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{13FCD062-82F0-4786-A9A2-1D382C085F96}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{13FCD062-82F0-4786-A9A2-1D382C085F96}.Release|Any CPU.Build.0 = Release|Any CPU
+		{165C6879-A388-49E2-A449-55C94FAE10D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{165C6879-A388-49E2-A449-55C94FAE10D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{165C6879-A388-49E2-A449-55C94FAE10D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{165C6879-A388-49E2-A449-55C94FAE10D3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal

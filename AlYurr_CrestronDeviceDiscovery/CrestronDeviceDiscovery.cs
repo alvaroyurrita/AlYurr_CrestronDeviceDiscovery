@@ -28,14 +28,13 @@ public partial class CrestronDeviceDiscovery
     private static int _discoverDevicesCount;
     /// <summary> Quantity of Discovered Devices </summary>
     private static int DiscoveredDevicesCount => _discoverDevicesCount;
-    private static SemaphoreSlim RunningSemaphore { get; } = new(1, 1);
     private static SemaphoreSlim EventSemaphore { get; } = new(1, 1);
     private static bool IsDiscovering { get; set; }
     private static string _error = "";
 
     private static async Task<List<ICrestronDevice>> DiscoverAsync(IpV4NetworkAdapter endPoint)
     {
-        _error = string.Empty;;
+        _error = string.Empty; ;
         var discoveredDevices = new Dictionary<string, ICrestronDevice>();
         var udpClient = new UdpClient();
         const int port = 41794;
@@ -91,45 +90,44 @@ public partial class CrestronDeviceDiscovery
                 }
             }
         ).Start();
-        await Task.Run(
-            async () =>
+        var timeout = DateTime.Now.AddSeconds(DISCOVERY_TIMEOUT);
+        while (DateTime.Now < timeout)
+        {
+            while (udpClient.Available > 0)
             {
-                var timeout = DateTime.Now.AddSeconds(DISCOVERY_TIMEOUT);
-                while (DateTime.Now < timeout)
-                while (udpClient.Available > 0)
-                    try
+                try
+                {
+                    var result = await udpClient.ReceiveAsync();
+                    if (result.Buffer.Length <= 0) continue;
+                    if (!result.Buffer.Take(autoDiscoverResponse.Length).SequenceEqual(autoDiscoverResponse))
+                        continue;
+                    var receivedMessage =
+                        Encoding.ASCII.GetString(result.Buffer.Skip(autoDiscoverResponse.Length).ToArray());
+                    var match = Regex.Match(
+                        receivedMessage,
+                        autoDiscoveryMessagePattern
+                    );
+                    if (match.Groups.Count < 4) continue;
+                    var device = new CrestronDeviceEventArgs
                     {
-                        var result = await udpClient.ReceiveAsync();
-                        if (result.Buffer.Length <= 0) continue;
-                        if (!result.Buffer.Take(autoDiscoverResponse.Length).SequenceEqual(autoDiscoverResponse))
-                            continue;
-                        var receivedMessage =
-                            Encoding.ASCII.GetString(result.Buffer.Skip(autoDiscoverResponse.Length).ToArray());
-                        var match = Regex.Match(
-                            receivedMessage,
-                            autoDiscoveryMessagePattern
-                        );
-                        if (match.Groups.Count < 4) continue;
-                        var device = new CrestronDeviceEventArgs
-                        {
-                            Hostname = match.Groups["hostname"].Value,
-                            Description = match.Groups["description"].Value,
-                            DeviceId = match.Groups["devid"].Value,
-                            IpAddress = result.RemoteEndPoint.Address.ToString()
-                        };
-                        if (!discoveredDevices.TryAdd(device.IpAddress, device)) continue;
-                        Interlocked.Increment(ref _discoverDevicesCount);
-                        await EventSemaphore.WaitAsync();
-                        DeviceDiscovered?.Invoke(null, device);
-                        EventSemaphore.Release();
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Error("Error while receiving UDP Packet: {Error}", ex.Message);
-                        _error = ex.Message;
-                    }
+                        Hostname = match.Groups["hostname"].Value,
+                        Description = match.Groups["description"].Value,
+                        DeviceId = match.Groups["devid"].Value,
+                        IpAddress = result.RemoteEndPoint.Address.ToString()
+                    };
+                    if (!discoveredDevices.TryAdd(device.DeviceId, device)) continue;
+                    Interlocked.Increment(ref _discoverDevicesCount);
+                    await EventSemaphore.WaitAsync();
+                    DeviceDiscovered?.Invoke(null, device);
+                    EventSemaphore.Release();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Error while receiving UDP Packet: {Error}", ex.Message);
+                    _error = ex.Message;
+                }
             }
-        );
+        }
         udpClient.Dispose();
         ClassLogger.Debug(
             "Ending Discovery Processes for Interface. {Devices}. Found {Number} devices",
@@ -137,7 +135,7 @@ public partial class CrestronDeviceDiscovery
             discoveredDevices.Count
         );
         // Semaphore.Release();
-        return discoveredDevices.Select(d => d.Value).ToList();
+        return [.. discoveredDevices.Select(d => d.Value)];
     }
     /// <summary> Discovers Crestron Devices on the local network </summary>
     /// <returns> List of Devices Discovered </returns>
@@ -152,7 +150,6 @@ public partial class CrestronDeviceDiscovery
     /// <returns> List of Devices Discovered </returns>
     public static async Task<List<ICrestronDevice>> DiscoverFromAdapters(List<IpV4NetworkAdapter> adapters)
     {
-        await RunningSemaphore.WaitAsync();
         IsDiscovering = true;
         var timer = new Timer(1000);
         timer.Start();
@@ -160,7 +157,7 @@ public partial class CrestronDeviceDiscovery
         stopwatch.Start();
         timer.Elapsed += (_, _) => { OnUpdateActivity(stopwatch); };
         var tasks = new List<Task<List<ICrestronDevice>>>();
-        foreach (var adapter in adapters) tasks.Add(DiscoverAsync(adapter));
+        foreach (var adapter in adapters) tasks.Add(Task.Run(()=>DiscoverAsync(adapter))); //makes sure that tasks are run in parallel by offloading CPU Bound work
         var individualResults = await Task.WhenAll(tasks);
         var results = new List<ICrestronDevice>();
         foreach (var individualResult in individualResults) results.AddRange(individualResult);
@@ -169,7 +166,6 @@ public partial class CrestronDeviceDiscovery
         OnUpdateActivity(stopwatch);
         stopwatch.Stop();
         stopwatch.Reset();
-        RunningSemaphore.Release();
         return results;
     }
 

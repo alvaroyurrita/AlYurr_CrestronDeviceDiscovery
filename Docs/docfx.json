@@ -3,7 +3,7 @@
     {
       "src": [
         {
-          "src": "../AYU_CrestronDeviceDiscovery",
+          "src": "../AlYurr_CrestronDeviceDiscovery",
           "files": [
             "**/*.csproj"
           ]
@@ -43,19 +43,19 @@
       "modern"
     ],
     "globalMetadata": {
-      "_appName": "DGI .Net TCP CLient",
-      "_appTitle": "DGI .Net TCP CLient",
+      "_appName": "Crestron Device Discovery",
+      "_appTitle": "Crestron Device Discovery",
       "_enableSearch": true,
       "pdf": false,
-      "_appFaviconPath": "images/favicon.png",
-      "_appLogoPath": "images/DGILogo.png",
+      "_appFaviconPath": "images/AlYurrLogo.svg",
+      "_appLogoPath": "images/AlYurrLogo.svg",
       "_appFooter": "<strong>Alvaro Yurrita</strong> © 2024",
       "_copyrightFooter": "MIT License",
       "_disableSideFilter": false,
       "_enableNewTab": false,
       "_disableContribution": false,
       "_disableBreadcrumb": false,
-      "_gitUrlPattern": "github",
+      "_gitUrlPattern": "github"
     }
   }
 }

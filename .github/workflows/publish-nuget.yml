@@ -48,7 +48,8 @@ jobs:
 
       - name: Publish to NuGet.org
         run: |
-            dotnet nuget push ./artifacts/*.nupkg \
+          dotnet nuget push ./artifacts/*.nupkg \
             --source https://api.nuget.org/v3/index.json \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
             --skip-duplicate
         if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
